@@ -7,7 +7,7 @@ class OpenAIService:
 
     def run_wordsmith(self, prompt: str):
         response = self.client.responses.create(
-            model="gpt-5-nano",
+            model="gpt-4o-mini",
             input=prompt
         )
         return response.output_text
