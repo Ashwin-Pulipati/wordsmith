@@ -1,21 +1,27 @@
-import re
+import csv
+import io
+import string
 from typing import List
+
+PUNCTUATION = string.punctuation
+
 
 def extract_keywords(text: str) -> List[str]:
     """
-    Convert a comma/space-separated keyword string into a clean list.
+    Convert a comma-separated keyword string into a clean list.
 
-    - Splits on commas, semicolons, or whitespace.
-    - Removes leading/trailing punctuation.
+    - Uses csv.reader to handle commas robustly.
+    - Strips whitespace and surrounding punctuation.
     - Lowercases all terms.
     - Filters out empty values.
     """
-    raw_parts = re.split(r"[,\s;]+", text.strip())
+    reader = csv.reader(io.StringIO(text))
+    row = next(reader, [])
 
-    cleaned = []
-    for part in raw_parts:
-        token = re.sub(r"^[^\w]+|[^\w]+$", "", part)
+    keywords: List[str] = []
+    for cell in row:
+        token = cell.strip().strip(PUNCTUATION).lower()
         if token:
-            cleaned.append(token.lower())
+            keywords.append(token)
 
-    return cleaned
+    return keywords
