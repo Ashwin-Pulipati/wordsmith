@@ -2,8 +2,8 @@ from typing import List
 
 import anyio
 
-from app.core.openai_client import openai_service
-from app.services.text_processing import extract_keywords
+from core.openai_client import openai_service
+from services.text_processing import extract_keywords
 
 
 class TopicTooLongError(ValueError):
