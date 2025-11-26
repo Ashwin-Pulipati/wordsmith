@@ -2,7 +2,7 @@ import asyncio
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.services.branding_service import BrandingService, TopicTooLongError
+from services.branding_service import BrandingService, TopicTooLongError
 
 router = APIRouter()
 branding_service = BrandingService()
