@@ -149,5 +149,6 @@
   @apply inline-block w-fit h-fit bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: 0.45px rgba(0, 0, 0, 0.8);
  }
 }
