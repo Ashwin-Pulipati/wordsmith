@@ -1,9 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useState, useMemo } from "react";
+import { useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
-import { Copy, Check } from "lucide-react";
 import axios from "axios";
 
 import { cn } from "@/lib/utils";
@@ -37,76 +36,50 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 
-import { BrandingClient, BrandingResult } from "@/lib/branding-client";
+import {
+  BrandingResult
+} from "@/lib/branding-client";
+import BrandVoiceField, { BrandingForm } from "./brand-voice-field";
+import useBrandingClient from "@/hooks/use-branding-client";
+import { useCopyFeedback } from "@/hooks/use-copy-feedback";
+import SamplePromptPanel, { SAMPLE_PROMPTS } from "./sample-prompt-panel";
+import PromptInsightsBox from "./prompt-insights-box";
+import ResultSection from "./result-section";
 
-type BrandingForm = {
-  topic: string;
-};
-
-type CopiedState =
-  | { type: "snippet"; value: number }
-  | { type: "keyword"; value: string }
-  | { type: null; value: null };
+const TOPIC_LIMIT = 100; 
 
 export default function WordsmithCard() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<BrandingResult | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<CopiedState>({
-    type: null,
-    value: null,
-  });
-
-  // For SR-only feedback when copy succeeds
-  const [copyMessage, setCopyMessage] = useState<string>("");
 
   const form = useForm<BrandingForm>({
-    defaultValues: { topic: "" },
+    defaultValues: { topic: "", voice: "neutral" },
     mode: "onSubmit",
   });
+
+  const brandingClient = useBrandingClient();
+  const { copied, message: copyMessage, handleCopy } = useCopyFeedback();
 
   const watchedTopic = form.watch("topic") ?? "";
   const isDisabled = isLoading || !watchedTopic.trim();
 
-  const brandingClient = useMemo(() => {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-    if (!baseUrl) {
-      console.error("NEXT_PUBLIC_BASE_URL is not defined for Wordsmith.");
-    }
-    return baseUrl ? new BrandingClient({ baseUrl, timeoutMs: 15000 }) : null;
-  }, []);
+  const applySamplePrompt = useCallback(
+    (sample: (typeof SAMPLE_PROMPTS)[number]) => {
+      form.setValue("topic", sample.topic, {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      });
+      form.setValue("voice", sample.voice, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+    },
+    [form]
+  );
 
-  const handleCopy = async ({
-    text,
-    type,
-    value,
-  }: {
-    text: string;
-    type: "snippet" | "keyword";
-    value: string | number;
-  }) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied({ type, value } as CopiedState);
-
-      const label =
-        type === "snippet"
-          ? "Branding snippet copied to clipboard."
-          : `Keyword "${text}" copied to clipboard.`;
-
-      setCopyMessage(label);
-
-      setTimeout(() => {
-        setCopied({ type: null, value: null });
-        setCopyMessage("");
-      }, 1500);
-    } catch (err) {
-      console.error("Copy failed:", err);
-      setCopyMessage("Copy to clipboard failed.");
-    }
-  };
-
-  const onSubmit = form.handleSubmit(async ({ topic }) => {
+  const onSubmit = form.handleSubmit(async ({ topic, voice }) => {
     setServerError(null);
     setResult(null);
 
@@ -118,30 +91,27 @@ export default function WordsmithCard() {
     setIsLoading(true);
 
     try {
-      const branding = await brandingClient.generateBranding(topic);
+      const branding = await brandingClient.generateBranding(topic, voice);
       setResult(branding);
-    } catch (e) {
-      const error = e as Error;
-      console.error("Branding error:", error);
-      setServerError(
-        error.message || "Something went wrong. Please try again."
-      );
+    } catch (e: unknown) {
+      console.error("Branding error:", e);
+      if (axios.isAxiosError(e) && e.response?.status === 400) {
+        const detail = (e.response.data as any)?.detail ?? "Topic is invalid.";
+        setServerError(detail);
+      } else {
+        setServerError("Something went wrong. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
   });
 
-  const snippetLines =
-    result?.brandingSnippet
-      ?.split(/\r?\n/)
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .slice(0, 2) ?? [];
-
-  const resultHeadingId = "wordsmith-result-heading";
+  const remainingChars = TOPIC_LIMIT - (form.getValues("topic")?.length ?? 0);
+  const helperId = "wordsmith-topic-help";
+  const counterId = "wordsmith-topic-counter";
 
   return (
-    <Card className="w-full max-w-md border border-border/80 shadow-lg shadow-primary/5">
+    <Card className="w-full max-w-2xl border border-border/80 shadow-lg shadow-primary/5">
       <CardHeader className="gap-4">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -152,9 +122,9 @@ export default function WordsmithCard() {
               <span className="text-gradient">Wordsmith</span>
             </CardTitle>
             <CardDescription className="mt-2 max-w-[28rem] text-sm">
-              Tell me what your brand is about and I&apos;ll generate a short
-              branding snippet and a set of keywords you can reuse across your
-              campaigns.
+              Tell me what your brand is about and I&apos;ll generate short
+              branding copy, keywords, and social-ready hashtags tailored to
+              your brand voice.
             </CardDescription>
           </div>
 
@@ -173,7 +143,6 @@ export default function WordsmithCard() {
         </div>
       </CardHeader>
 
-      {/* SR-only live region for copy feedback */}
       <div aria-live="polite" className="sr-only">
         {copyMessage}
       </div>
@@ -191,57 +160,58 @@ export default function WordsmithCard() {
               rules={{
                 required: "Please enter a brand topic.",
                 maxLength: {
-                  value: 32,
-                  message: "Topic must be 32 characters or fewer.",
+                  value: TOPIC_LIMIT,
+                  message: `Topic must be ${TOPIC_LIMIT} characters or fewer.`,
                 },
               }}
-              render={({ field }) => {
-                const remaining = 32 - (field.value?.length ?? 0);
-                const helperId = "wordsmith-topic-help";
-                const counterId = "wordsmith-topic-counter";
-
-                return (
-                  <FormItem>
-                    <FormLabel className="flex justify-between gap-2">
-                      <span>Brand topic</span>
-                      <span
-                        id={counterId}
-                        className="text-xs text-muted-foreground"
-                      >
-                        {Math.max(0, remaining)} characters left
-                      </span>
-                    </FormLabel>
-                    <FormControl>
-                      <InputGroup
-                        aria-label="Tell Wordsmith what your brand is about"
-                        aria-describedby={`${helperId} ${counterId}`}
-                      >
-                        <InputGroupAddon align="inline-start">
-                          <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                            Prompt
-                          </span>
-                        </InputGroupAddon>
-                        <InputGroupInput
-                          {...field}
-                          maxLength={32} // aligns with validation
-                          autoComplete="off"
-                          autoCorrect="off"
-                          spellCheck={false}
-                          placeholder="e.g. specialty coffee roastery"
-                        />
-                      </InputGroup>
-                    </FormControl>
-                    <p
-                      id={helperId}
-                      className="text-xs text-muted-foreground mt-1"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex justify-between gap-2">
+                    <span>Brand topic</span>
+                    <span
+                      id={counterId}
+                      className="text-xs text-muted-foreground"
                     >
-                      Keep it short and specific — up to 32 characters.
-                    </p>
-                    <FormMessage />
-                  </FormItem>
-                );
-              }}
+                      {Math.max(0, remainingChars)} characters left
+                    </span>
+                  </FormLabel>
+                  <FormControl>
+                    <InputGroup
+                      aria-label="Tell Wordsmith what your brand is about"
+                      aria-describedby={`${helperId} ${counterId}`}
+                    >
+                      <InputGroupAddon align="inline-start">
+                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                          Prompt
+                        </span>
+                        <span className="h-6 border-r-2 border-border/80"></span>
+                      </InputGroupAddon>
+                      <InputGroupInput
+                        {...field}
+                        maxLength={TOPIC_LIMIT}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        placeholder="e.g. specialty coffee roastery"
+                      />
+                    </InputGroup>
+                  </FormControl>
+                  <p
+                    id={helperId}
+                    className="text-xs text-muted-foreground mt-1"
+                  >
+                    Keep it short and specific — up to {TOPIC_LIMIT} characters.
+                  </p>
+                  <FormMessage />
+
+                  <SamplePromptPanel onApply={applySamplePrompt} />
+                </FormItem>
+              )}
             />
+
+            <BrandVoiceField control={form.control} />
+
+            <PromptInsightsBox result={result} />
 
             {isLoading && (
               <div
@@ -250,7 +220,7 @@ export default function WordsmithCard() {
                 aria-live="polite"
               >
                 <span className="inline-flex size-2 rounded-full bg-primary animate-pulse" />
-                Generating copy and keywords…
+                Generating copy, keywords, and hashtags…
               </div>
             )}
 
@@ -261,116 +231,11 @@ export default function WordsmithCard() {
             )}
 
             {result && !isLoading && (
-              <section
-                aria-labelledby={resultHeadingId}
-                className="mt-1 space-y-4 rounded-lg border bg-secondary/70 px-3 py-3"
-              >
-                <h2
-                  id={resultHeadingId}
-                  className="text-sm font-semibold sr-only"
-                >
-                  Branding result
-                </h2>
-
-                {/* BRANDING SNIPPETS */}
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold">Branding snippets</h3>
-
-                  {snippetLines.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      No snippets returned. Try a different topic.
-                    </p>
-                  ) : (
-                    <div className="grid gap-2">
-                      {snippetLines.map((snippet, index) => (
-                        <div
-                          key={index}
-                          className="flex items-start justify-between gap-3 rounded-md border bg-card/60 px-3 py-2"
-                        >
-                          <p className="text-sm leading-relaxed">{snippet}</p>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            className="shrink-0"
-                            onClick={() =>
-                              handleCopy({
-                                text: snippet,
-                                type: "snippet",
-                                value: index,
-                              })
-                            }
-                            aria-label={
-                              copied.type === "snippet" &&
-                              copied.value === index
-                                ? "Branding snippet copied"
-                                : "Copy branding snippet"
-                            }
-                          >
-                            {copied.type === "snippet" &&
-                            copied.value === index ? (
-                              <>
-                                <Check className="size-4" />
-                                <span className="sr-only">Copied</span>
-                              </>
-                            ) : (
-                              <Copy className="size-4" />
-                            )}
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* KEYWORDS */}
-                <div className="space-y-1">
-                  <h3 className="text-sm font-semibold">Keywords</h3>
-
-                  {result.keywords.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      No keywords returned for this topic.
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {result.keywords.map((kw) => (
-                        <Button
-                          key={kw}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            handleCopy({
-                              text: kw,
-                              type: "keyword",
-                              value: kw,
-                            })
-                          }
-                          aria-label={
-                            copied.type === "keyword" && copied.value === kw
-                              ? `Keyword "${kw}" copied`
-                              : `Copy keyword "${kw}"`
-                          }
-                          className={cn(
-                            "h-7 px-3 rounded-full text-xs inline-flex items-center gap-1.5",
-                            "bg-accent/40 hover:bg-accent/70"
-                          )}
-                        >
-                          <span>{kw}</span>
-                          {copied.type === "keyword" && copied.value === kw ? (
-                            <>
-                              <Check className="size-3.5" />
-                              <span className="sr-only">Copied</span>
-                            </>
-                          ) : (
-                            <Copy className="size-3.5" />
-                          )}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </section>
+              <ResultSection
+                result={result}
+                copied={copied}
+                onCopy={handleCopy}
+              />
             )}
           </CardContent>
 

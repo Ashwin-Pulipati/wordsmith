@@ -25,3 +25,27 @@ def extract_keywords(text: str) -> List[str]:
             keywords.append(token)
 
     return keywords
+
+
+def build_hashtags(keywords: List[str]) -> List[str]:
+    """
+    Turn keywords into simple social-ready hashtags.
+
+    - Removes internal spaces.
+    - Keeps only basic word characters and '#'.
+    - Deduplicates while preserving order.
+    """
+    seen = set()
+    hashtags: List[str] = []
+
+    for kw in keywords:
+        base = "".join(ch for ch in kw if ch.isalnum() or ch == " ")
+        base = base.replace(" ", "")
+        if not base:
+            continue
+        tag = f"#{base}"
+        if tag not in seen:
+            seen.add(tag)
+            hashtags.append(tag)
+
+    return hashtags
