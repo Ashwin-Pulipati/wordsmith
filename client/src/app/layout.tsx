@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Caesar_Dressing, Tillana, Nunito_Sans } from "next/font/google";
 import { ThemeProvider as NextJSThemeProvider } from "next-themes";
 import "./globals.css";
+import Header from "@/components/header";
+import Footer from "@/components/footer";
+import Scroller from "@/components/scroller";
 
 const caesarDressing = Caesar_Dressing({
   variable: "--font-caesarDressing",
@@ -44,7 +47,12 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
         >
-          {children}
+          <Header />
+          <main className="min-h-screen container mx-auto max-w-7xl px-4 py-8 lg:pt-18">
+            {children}
+          </main>
+          <Footer />
+          <Scroller />
         </NextJSThemeProvider>
       </body>
     </html>
