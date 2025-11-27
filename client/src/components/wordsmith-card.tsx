@@ -48,6 +48,45 @@ import ResultSection from "./result-section";
 
 const TOPIC_LIMIT = 100; 
 
+function isMeaningfulTopic(raw: string): boolean {
+  const topic = raw.trim();
+
+  if (!topic) return false;
+  if (topic.length < 3) return false;
+
+  const letters = topic.replace(/[^a-z]/gi, "");
+  if (!letters) return false;
+
+  const totalLen = topic.length;
+  const nonLetters = totalLen - letters.length;
+ 
+  if (totalLen >= 12 && nonLetters / totalLen > 0.4) {
+    return false;
+  }
+  
+  if (
+    letters.length >= 6 &&
+    new Set(letters.toLowerCase().split("")).size <= 2
+  ) {
+    return false;
+  }
+  
+  const tokens = topic.toLowerCase().split(/\s+/).filter(Boolean);
+
+  const wordLikeTokens = tokens.filter((t) => /[a-z]/.test(t));
+
+  const hasRealWord = wordLikeTokens.some((token) => {
+    const t = token.replace(/[^a-z]/g, "");
+    if (t.length < 3 || t.length > 40) return false;
+    const vowels = (t.match(/[aeiou]/g) || []).length;
+    return vowels >= 1;
+  });
+
+  if (!hasRealWord) return false;
+
+  return true;
+}
+
 export default function WordsmithCard() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<BrandingResult | null>(null);
@@ -55,14 +94,15 @@ export default function WordsmithCard() {
 
   const form = useForm<BrandingForm>({
     defaultValues: { topic: "", voice: "neutral" },
-    mode: "onSubmit",
+    mode: "onChange",
   });
 
   const brandingClient = useBrandingClient();
   const { copied, message: copyMessage, handleCopy } = useCopyFeedback();
 
   const watchedTopic = form.watch("topic") ?? "";
-  const isDisabled = isLoading || !watchedTopic.trim();
+  const hasTopicError = !!form.formState.errors.topic;
+  const isDisabled = isLoading || !watchedTopic.trim() || hasTopicError;
 
   const applySamplePrompt = useCallback(
     (sample: (typeof SAMPLE_PROMPTS)[number]) => {
@@ -105,10 +145,6 @@ export default function WordsmithCard() {
       setIsLoading(false);
     }
   });
-
-  const remainingChars = TOPIC_LIMIT - (form.getValues("topic")?.length ?? 0);
-  const helperId = "wordsmith-topic-help";
-  const counterId = "wordsmith-topic-counter";
 
   return (
     <Card className="w-full max-w-2xl border border-border/80 shadow-lg shadow-primary/5">
@@ -163,50 +199,62 @@ export default function WordsmithCard() {
                   value: TOPIC_LIMIT,
                   message: `Topic must be ${TOPIC_LIMIT} characters or fewer.`,
                 },
+                validate: {
+                  meaningful: (value) =>
+                    !value ||
+                    isMeaningfulTopic(value) ||
+                    "Please enter a short, descriptive brand topic (e.g. 'specialty coffee roastery' or 'AI finance coach').",
+                },
               }}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex justify-between gap-2">
-                    <span>Brand topic</span>
-                    <span
-                      id={counterId}
-                      className="text-xs text-muted-foreground"
-                    >
-                      {Math.max(0, remainingChars)} characters left
-                    </span>
-                  </FormLabel>
-                  <FormControl>
-                    <InputGroup
-                      aria-label="Tell Wordsmith what your brand is about"
-                      aria-describedby={`${helperId} ${counterId}`}
-                    >
-                      <InputGroupAddon align="inline-start">
-                        <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                          Prompt
-                        </span>
-                        <span className="h-6 border-r-2 border-border/80"></span>
-                      </InputGroupAddon>
-                      <InputGroupInput
-                        {...field}
-                        maxLength={TOPIC_LIMIT}
-                        autoComplete="off"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        placeholder="e.g. specialty coffee roastery"
-                      />
-                    </InputGroup>
-                  </FormControl>
-                  <p
-                    id={helperId}
-                    className="text-xs text-muted-foreground mt-1"
-                  >
-                    Keep it short and specific — up to {TOPIC_LIMIT} characters.
-                  </p>
-                  <FormMessage />
+              render={({ field }) => {
+                const remaining = TOPIC_LIMIT - (field.value?.length ?? 0);
+                const helperId = "wordsmith-topic-help";
+                const counterId = "wordsmith-topic-counter";
 
-                  <SamplePromptPanel onApply={applySamplePrompt} />
-                </FormItem>
-              )}
+                return (
+                  <FormItem>
+                    <FormLabel className="flex justify-between gap-2">
+                      <span>Brand topic</span>
+                      <span
+                        id={counterId}
+                        className="text-xs text-muted-foreground"
+                      >
+                        {Math.max(0, remaining)} characters left
+                      </span>
+                    </FormLabel>
+                    <FormControl>
+                      <InputGroup
+                        aria-label="Tell Wordsmith what your brand is about"
+                        aria-describedby={`${helperId} ${counterId}`}
+                      >
+                        <InputGroupAddon align="inline-start">
+                          <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                            Prompt
+                          </span>
+                        </InputGroupAddon>
+                        <InputGroupInput
+                          {...field}
+                          maxLength={TOPIC_LIMIT}
+                          autoComplete="off"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          placeholder="e.g. specialty coffee roastery"
+                        />
+                      </InputGroup>
+                    </FormControl>
+                    <p
+                      id={helperId}
+                      className="text-xs text-muted-foreground mt-1"
+                    >
+                      Keep it short and specific — up to {TOPIC_LIMIT}{" "}
+                      characters.
+                    </p>
+                    <FormMessage />
+                  
+                    <SamplePromptPanel onApply={applySamplePrompt} />
+                  </FormItem>
+                );
+              }}
             />
 
             <BrandVoiceField control={form.control} />
