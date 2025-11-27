@@ -231,6 +231,7 @@ export default function WordsmithCard() {
                           <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                             Prompt
                           </span>
+                          <span className="h-6 border-r-2 border-border/80"></span>
                         </InputGroupAddon>
                         <InputGroupInput
                           {...field}

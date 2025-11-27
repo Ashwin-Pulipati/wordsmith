@@ -57,7 +57,7 @@ export default function SamplePromptPanel({ onApply }: SamplePromptProps) {
       aria-label="Example brand topics"
       className="rounded-lg border bg-secondary/60 px-3 py-2 space-y-2"
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           Quick start
         </p>
