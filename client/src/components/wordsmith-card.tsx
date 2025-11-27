@@ -149,13 +149,13 @@ export default function WordsmithCard() {
   return (
     <Card className="w-full max-w-2xl border border-border/80 shadow-lg shadow-primary/5">
       <CardHeader className="gap-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Branding assistant
             </p>
-            <CardTitle className="mt-1 text-2xl font-semibold leading-tight">
-              <span className="text-gradient">Wordsmith</span>
+            <CardTitle className="mt-1 text-3xl font-semibold leading-tight">
+              <span className="text-gradient font-display">WORDSMITH</span>
             </CardTitle>
             <CardDescription className="mt-2 max-w-[28rem] text-sm">
               Tell me what your brand is about and I&apos;ll generate short
@@ -251,7 +251,7 @@ export default function WordsmithCard() {
                       characters.
                     </p>
                     <FormMessage />
-                  
+
                     <SamplePromptPanel onApply={applySamplePrompt} />
                   </FormItem>
                 );
