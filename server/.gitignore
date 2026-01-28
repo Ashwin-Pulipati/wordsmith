@@ -12,6 +12,14 @@ build/
 *.log
 
 # =========================
+# Testing & Coverage
+# =========================
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# =========================
 # Virtual environments
 # =========================
 .venv/
