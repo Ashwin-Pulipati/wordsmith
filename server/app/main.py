@@ -8,6 +8,10 @@ app = FastAPI()
 
 app.include_router(wordsmith_router)
 
+@app.get("/")
+def root():
+    return {"status": "ok", "message": "Wordsmith API is running"}
+
 origins = ['http://localhost:3000']
 app.add_middleware(
     CORSMiddleware,
